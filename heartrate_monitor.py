@@ -59,9 +59,17 @@ class HeartRateMonitor(object):
                             print("BPM: {0}, SpO2: {1}".format(self.bpm, spo2))
 
             time.sleep(self.LOOP_TIME)
-
+     
+        print(bpm)
+        
         sensor.shutdown()
-
+        self.emd(bpm)
+        
+    #This method detects the emergency based on input parameters -Apurva Mokal    
+    def emd(self, hrbpm):
+        if hrbpm>30:
+           msg="Unusual heartrate:"
+           print(msg)
     def start_sensor(self):
         self._thread = threading.Thread(target=self.run_sensor)
         self._thread.stopped = False
