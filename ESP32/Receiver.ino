@@ -18,6 +18,7 @@
 #define RST 14
 #define DIO0 26
 
+//LoRa Frequency
 //433E6 for Asia
 //866E6 for Europe
 //915E6 for North America
@@ -51,6 +52,7 @@ void setup() {
     for(;;); // Don't proceed, loop forever
   }
 
+  //Prepare Display
   display.clearDisplay();
   display.setTextColor(WHITE);
   display.setTextSize(1);
@@ -100,16 +102,18 @@ void loop() {
 
     String lat = doc["lat"];
     String lng = doc["lng"];
+    String msg = doc["msg"];
     int cnt = doc["counter"];
    // Dsiplay information
    display.clearDisplay();
    display.setCursor(0,0);
    display.print("LORA RECEIVER");
    display.setCursor(0,20);
-   display.print("Received packet:");
+   display.print("Received Alert:");
    display.setCursor(0,30);
-   display.print(cnt);
+   display.print(msg);
    display.setCursor(0,40);
+   //RSSI output on OLED 
    //display.print("RSSI:");
    //display.setCursor(30,40);
    //display.print(rssi);
