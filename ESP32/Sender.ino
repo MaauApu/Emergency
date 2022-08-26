@@ -1,22 +1,24 @@
 
-//LoRa Sender
+//LoRa Sender developed and edited by Apurva Ajay Mokal, DCU
 //Libraries for LoRa
 #include <SPI.h>
 #include <LoRa.h>
 
 //GPS Libraries
-//#include <TinyGPS++.h>                    
+#include <TinyGPSPlus.h>
+#include <TinyGPS++.h> 
+
+                      
+#include <ArduinoJson.h>
 //#include <RadioLib.h>
 //#include "boards.h"
-#include <TinyGPSPlus.h>
-#include <ArduinoJson.h>
 #define   ERR_NONE   0
 
 //Libraries for OLED Display
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-
+//#include <U8x8lib.h>
 
 //Libraries for Sensor
 #include "MAX30105.h"
@@ -52,7 +54,7 @@ int beatAvg;
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
-// A sample stream.
+// A sample NMEA stream.
 const char *gpsStream =
   "$GPRMC,045103.000,A,3014.1984,N,09749.2872,W,0.67,161.46,030913,,,A*7C\r\n"
   "$GPGGA,045104.000,3014.1985,N,09749.2873,W,1,09,1.2,211.6,M,-22.5,M,,0000*62\r\n"
@@ -65,10 +67,10 @@ const char *gpsStream =
 TinyGPSPlus gps;
 //JSONVar data;
 
+
 //packet counter
 int counter = 0;
 
-//Initialize Display
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RST);
 
 void setup() {
@@ -89,7 +91,7 @@ void setup() {
 
 
     // Initialize sensor
-  if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) {
+  if (!particleSensor.begin(Wire,0x57 ,I2C_SPEED_FAST)) {
     Serial.println("MAX30102 was not found. Please check wiring/power. ");
     while (1);
   }
@@ -124,65 +126,17 @@ void setup() {
   display.display();
   delay(2000);
 }
-//Methon to calculate
-int checkEmergency()
-{
-
-long irValue = particleSensor.getIR();
-
-  if (checkForBeat(irValue) == true) {
-    //We sensed a beat!
-    long delta = millis() - lastBeat;
-    lastBeat = millis();
-
-    beatsPerMinute = 60 / (delta / 1000.0);
-
-    if (beatsPerMinute < 255 && beatsPerMinute > 20) {
-      rates[rateSpot++] = (byte)beatsPerMinute; //Store this reading in the array
-      rateSpot %= RATE_SIZE; //Wrap variable
-
-      //Take average of readings
-      beatAvg = 0;
-      for (byte x = 0 ; x < RATE_SIZE ; x++)
-        beatAvg += rates[x];
-      beatAvg /= RATE_SIZE;
-    }
-  }
-
-  Serial.print("IR=");
-  Serial.print(irValue);
-  Serial.print(", BPM=");
-  Serial.print(beatsPerMinute);
-  Serial.print(", Avg BPM=");
-  Serial.print(beatAvg);
-
-  if (irValue < 50000)
-    Serial.print(" No finger?");
-    
-  delay(1000);
-
-  //if(beatsPerMinute<30 && beatsPerMinute>150)
-  //{
-  //  Serial.print(" Alert: Medical Emergency");
-
-    Serial.println();
-    return 1;
-  //}
-  
-
-  Serial.println();
-
- 
-}
 
 void loop() {
    
   Serial.print("Sending packet: ");
   Serial.println(counter);
 
-/ gps.encode(*gpsStream);
- //int flag=1;
-  int flag=checkEmergency();
+  gps.encode(*gpsStream);
+ int flag=1;
+flag=checkEmergency();
+  
+  // Generate the minified JSON and send it to the Serial port.
   DynamicJsonDocument doc(200);
   doc["lat"] = 53.3866166;
   doc["lng"] = -6.2549383;
@@ -191,20 +145,14 @@ void loop() {
   String data_json;
   serializeJson(doc, data_json);
   Serial.println(data_json);
-//  StaticJsonDocument<200> doc;
-  doc["lat"] = gps.location.lat();
-  doc["lng"] = gps.location.lng();
-//
-//  // Generate the minified JSON and send it to the Serial port.
-//  //
-//  char out[128];
-//  int b =serializeJson(doc, out);
-//  Serial.print("bytes = ");
-//  Serial.println(b,DEC);
+
+ doc["lat"] = gps.location.lat();
+ doc["lng"] = gps.location.lng();
+
+
 
   //Send LoRa packet to receiver
   LoRa.beginPacket();
-  //LoRa.print("hello ");
   LoRa.print(data_json);
 //  LoRa.print(b);
   LoRa.endPacket();
@@ -239,4 +187,50 @@ void loop() {
   delay(10000);
     }
     
+}
+
+//Method to calculate HR and detect emergency
+int checkEmergency()
+{
+
+long irValue = particleSensor.getIR();
+
+  if (checkForBeat(irValue) == true) {
+    //We sensed a beat!
+    long delta = millis() - lastBeat;
+    lastBeat = millis();
+
+    beatsPerMinute = 60 / (delta / 1000.0);
+
+    if (beatsPerMinute < 255 && beatsPerMinute > 20) {
+      rates[rateSpot++] = (byte)beatsPerMinute; //Store this reading in the array
+      rateSpot %= RATE_SIZE; //Wrap variable
+
+      //Take average of readings
+      beatAvg = 0;
+      for (byte x = 0 ; x < RATE_SIZE ; x++)
+        beatAvg += rates[x];
+      beatAvg /= RATE_SIZE;
+    }
+  }
+
+  Serial.print("IR=");
+  Serial.print(irValue);
+  Serial.print(", BPM=");
+  Serial.print(beatsPerMinute);
+  Serial.print(", Avg BPM=");
+  Serial.print(beatAvg);
+
+  if (irValue < 50000)
+    Serial.print(" No finger?");
+  
+  if(beatsPerMinute<30 && beatsPerMinute>150)
+  {
+   Serial.print(" Alert: Medical Emergency");
+
+    Serial.println();
+    return 1;
+  }
+
+ return 1;
 }
